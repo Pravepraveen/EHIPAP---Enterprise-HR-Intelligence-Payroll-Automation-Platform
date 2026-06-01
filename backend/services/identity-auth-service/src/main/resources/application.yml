@@ -1,0 +1,47 @@
+server:
+  port: 8081
+spring:
+  application:
+    name: identity-auth-service
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/ehipap}
+    username: ${DB_USERNAME:ehipap}
+    password: ${DB_PASSWORD:ehipap_secret_2024}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 30000
+  jpa:
+    hibernate:
+      ddl-auto: none
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: 2000ms
+jwt:
+  secret: ${JWT_SECRET:ehipap_jwt_super_secret_key_2024_production_grade_minimum_256_bits}
+  expiration: ${JWT_EXPIRATION:86400000}
+  refresh-expiration: ${JWT_REFRESH_EXPIRATION:604800000}
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+logging:
+  level:
+    com.ehipap: DEBUG

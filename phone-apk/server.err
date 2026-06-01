@@ -1,0 +1,37 @@
+10.92.250.53 - - [31/May/2026 15:48:05] "GET /EHIPAP.apk HTTP/1.1" 200 -
+10.92.250.195 - - [31/May/2026 16:06:22] "GET /EHIPAP.apk HTTP/1.1" 200 -
+127.0.0.1 - - [31/May/2026 17:12:22] "HEAD /EHIPAP.apk HTTP/1.1" 200 -
+10.92.250.53 - - [31/May/2026 17:12:22] "HEAD /EHIPAP.apk HTTP/1.1" 200 -
+10.92.250.195 - - [31/May/2026 17:14:43] "GET /EHIPAP.apk HTTP/1.1" 200 -
+----------------------------------------
+Exception occurred during processing of request from ('10.92.250.195', 44926)
+Traceback (most recent call last):
+  File "C:\Python314\Lib\socketserver.py", line 697, in process_request_thread
+    self.finish_request(request, client_address)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python314\Lib\http\server.py", line 1422, in finish_request
+    self.RequestHandlerClass(request, client_address, self,
+    ~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                             directory=args.directory)
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python314\Lib\http\server.py", line 732, in __init__
+    super().__init__(*args, **kwargs)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "C:\Python314\Lib\socketserver.py", line 766, in __init__
+    self.handle()
+    ~~~~~~~~~~~^^
+  File "C:\Python314\Lib\http\server.py", line 496, in handle
+    self.handle_one_request()
+    ~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Python314\Lib\http\server.py", line 464, in handle_one_request
+    self.raw_requestline = self.rfile.readline(65537)
+                           ~~~~~~~~~~~~~~~~~~~^^^^^^^
+  File "C:\Python314\Lib\socket.py", line 725, in readinto
+    return self._sock.recv_into(b)
+           ~~~~~~~~~~~~~~~~~~~~^^^
+ConnectionResetError: [WinError 10054] An existing connection was forcibly closed by the remote host
+----------------------------------------
+10.92.250.53 - - [31/May/2026 17:27:45] "HEAD /EHIPAP.apk HTTP/1.1" 200 -
+10.92.250.195 - - [31/May/2026 17:31:10] "GET /EHIPAP.apk HTTP/1.1" 200 -
+10.92.250.53 - - [31/May/2026 17:47:17] "HEAD /EHIPAP.apk HTTP/1.1" 200 -
+10.92.250.195 - - [31/May/2026 17:49:41] "GET /EHIPAP.apk HTTP/1.1" 200 -

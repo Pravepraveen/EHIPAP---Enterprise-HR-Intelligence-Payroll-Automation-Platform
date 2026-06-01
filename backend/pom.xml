@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>com.ehipap</groupId>
+    <artifactId>ehipap-backend</artifactId>
+    <version>1.0.0</version>
+    <packaging>pom</packaging>
+    <name>EHIPAP Backend</name>
+
+    <modules>
+        <module>infrastructure/api-gateway</module>
+        <module>services/identity-auth-service</module>
+        <module>services/employee-lifecycle-service</module>
+        <module>services/payroll-computation-engine</module>
+        <module>services/attendance-leave-service</module>
+        <module>services/recruitment-ats-service</module>
+        <module>services/performance-management-service</module>
+        <module>services/notification-communication-service</module>
+        <module>services/analytics-reporting-service</module>
+    </modules>
+
+    <properties>
+        <java.version>21</java.version>
+        <spring-boot.version>3.3.0</spring-boot.version>
+        <spring-cloud.version>2023.0.2</spring-cloud.version>
+        <maven.compiler.source>21</maven.compiler.source>
+        <maven.compiler.target>21</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    </properties>
+</project>

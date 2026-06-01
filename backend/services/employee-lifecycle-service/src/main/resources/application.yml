@@ -1,0 +1,47 @@
+server:
+  port: 8082
+spring:
+  application:
+    name: employee-lifecycle-service
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/ehipap}
+    username: ${DB_USERNAME:ehipap}
+    password: ${DB_PASSWORD:ehipap_secret_2024}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: none
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+auth:
+  service:
+    url: ${AUTH_SERVICE_URL:http://localhost:8081}
+jwt:
+  secret: ${JWT_SECRET:ehipap_jwt_super_secret_key_2024_production_grade_minimum_256_bits}
+minio:
+  endpoint: ${MINIO_ENDPOINT:http://localhost:9000}
+  access-key: ${MINIO_ACCESS_KEY:minio_admin}
+  secret-key: ${MINIO_SECRET_KEY:minio_secret_2024}
+  bucket: ehipap-documents
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html

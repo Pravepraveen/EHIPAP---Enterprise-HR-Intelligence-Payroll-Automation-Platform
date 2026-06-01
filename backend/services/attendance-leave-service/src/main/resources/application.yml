@@ -1,0 +1,31 @@
+server:
+  port: 8084
+spring:
+  application:
+    name: attendance-leave-service
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/ehipap}
+    username: ${DB_USERNAME:ehipap}
+    password: ${DB_PASSWORD:ehipap_secret_2024}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: none
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+jwt:
+  secret: ${JWT_SECRET:ehipap_jwt_super_secret_key_2024_production_grade_minimum_256_bits}
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

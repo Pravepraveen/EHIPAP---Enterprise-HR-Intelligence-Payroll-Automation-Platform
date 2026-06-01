@@ -1,0 +1,394 @@
+networks:
+  ehipap-net:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  redis-data:
+  minio-data:
+
+x-common-service-env: &common-service-env
+  SPRING_PROFILES_ACTIVE: docker
+  DB_URL: jdbc:postgresql://postgres:5432/ehipap
+  DB_USERNAME: ehipap
+  DB_PASSWORD: ehipap_secret_2024
+  REDIS_HOST: redis
+  REDIS_PORT: "6379"
+  REDIS_PASSWORD: ""
+  SPRING_DATA_REDIS_PASSWORD: ""
+  KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+  JWT_SECRET: ehipap_jwt_super_secret_key_2024_production_grade_minimum_256_bits
+  JWT_EXPIRATION: "86400000"
+  JWT_REFRESH_EXPIRATION: "604800000"
+  MINIO_ENDPOINT: http://minio:9000
+  MINIO_ACCESS_KEY: minio_admin
+  MINIO_SECRET_KEY: minio_secret_2024
+
+x-app-healthcheck: &app-healthcheck
+  interval: 20s
+  timeout: 10s
+  retries: 10
+  start_period: 60s
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: ehipap-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ehipap
+      POSTGRES_PASSWORD: ehipap_secret_2024
+      POSTGRES_DB: ehipap
+    expose:
+      - "5432"
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./infra/docker/postgres/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    networks:
+      - ehipap-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ehipap -d ehipap"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: ehipap-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    expose:
+      - "6379"
+    ports:
+      - "6381:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - ehipap-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.1
+    container_name: ehipap-zookeeper
+    restart: unless-stopped
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    expose:
+      - "2181"
+    networks:
+      - ehipap-net
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 2181"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  kafka:
+    image: confluentinc/cp-kafka:7.6.1
+    container_name: ehipap-kafka
+    restart: unless-stopped
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29092,PLAINTEXT_HOST://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+    expose:
+      - "9092"
+    networks:
+      - ehipap-net
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:29092 >/dev/null 2>&1"]
+      interval: 15s
+      timeout: 10s
+      retries: 12
+      start_period: 30s
+
+  minio:
+    image: minio/minio:latest
+    container_name: ehipap-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minio_admin
+      MINIO_ROOT_PASSWORD: minio_secret_2024
+    expose:
+      - "9000"
+      - "9001"
+    volumes:
+      - minio-data:/data
+    networks:
+      - ehipap-net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9000/minio/health/live >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  minio-init:
+    image: minio/mc:latest
+    container_name: ehipap-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 minio_admin minio_secret_2024 &&
+      mc mb -p local/ehipap-documents || true &&
+      mc mb -p local/ehipap-payslips || true"
+    networks:
+      - ehipap-net
+    restart: "no"
+
+  identity-auth-service:
+    build:
+      context: ./backend/services/identity-auth-service
+    image: ehipap-auth:latest
+    container_name: ehipap-auth
+    restart: unless-stopped
+    environment:
+      <<: *common-service-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    expose:
+      - "8081"
+    networks:
+      - ehipap-net
+    healthcheck:
+      <<: *app-healthcheck
+      test: ["CMD-SHELL", "bash -ec 'cat < /dev/null > /dev/tcp/127.0.0.1/8081'"]
+
+  employee-lifecycle-service:
+    build:
+      context: ./backend/services/employee-lifecycle-service
+    image: ehipap-employee:latest
+    container_name: ehipap-employee
+    restart: unless-stopped
+    environment:
+      <<: *common-service-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    expose:
+      - "8082"
+    networks:
+      - ehipap-net
+    healthcheck:
+      <<: *app-healthcheck
+      test: ["CMD-SHELL", "bash -ec 'cat < /dev/null > /dev/tcp/127.0.0.1/8082'"]
+
+  payroll-computation-engine:
+    build:
+      context: ./backend/services/payroll-computation-engine
+    image: ehipap-payroll:latest
+    container_name: ehipap-payroll
+    restart: unless-stopped
+    environment:
+      <<: *common-service-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    expose:
+      - "8083"
+    networks:
+      - ehipap-net
+    healthcheck:
+      <<: *app-healthcheck
+      test: ["CMD-SHELL", "bash -ec 'cat < /dev/null > /dev/tcp/127.0.0.1/8083'"]
+
+  attendance-leave-service:
+    build:
+      context: ./backend/services/attendance-leave-service
+    image: ehipap-attendance:latest
+    container_name: ehipap-attendance
+    restart: unless-stopped
+    environment:
+      <<: *common-service-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    expose:
+      - "8084"
+    networks:
+      - ehipap-net
+    healthcheck:
+      <<: *app-healthcheck
+      test: ["CMD-SHELL", "bash -ec 'cat < /dev/null > /dev/tcp/127.0.0.1/8084'"]
+
+  recruitment-ats-service:
+    build:
+      context: ./backend/services/recruitment-ats-service
+    image: ehipap-recruitment:latest
+    container_name: ehipap-recruitment
+    restart: unless-stopped
+    environment:
+      <<: *common-service-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    expose:
+      - "8085"
+    networks:
+      - ehipap-net
+    healthcheck:
+      <<: *app-healthcheck
+      test: ["CMD-SHELL", "bash -ec 'cat < /dev/null > /dev/tcp/127.0.0.1/8085'"]
+
+  performance-management-service:
+    build:
+      context: ./backend/services/performance-management-service
+    image: ehipap-performance:latest
+    container_name: ehipap-performance
+    restart: unless-stopped
+    environment:
+      <<: *common-service-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    expose:
+      - "8086"
+    networks:
+      - ehipap-net
+    healthcheck:
+      <<: *app-healthcheck
+      test: ["CMD-SHELL", "bash -ec 'cat < /dev/null > /dev/tcp/127.0.0.1/8086'"]
+
+  notification-communication-service:
+    build:
+      context: ./backend/services/notification-communication-service
+    image: ehipap-notification:latest
+    container_name: ehipap-notification
+    restart: unless-stopped
+    environment:
+      <<: *common-service-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    expose:
+      - "8087"
+    networks:
+      - ehipap-net
+    healthcheck:
+      <<: *app-healthcheck
+      test: ["CMD-SHELL", "bash -ec 'cat < /dev/null > /dev/tcp/127.0.0.1/8087'"]
+
+  analytics-reporting-service:
+    build:
+      context: ./backend/services/analytics-reporting-service
+    image: ehipap-analytics:latest
+    container_name: ehipap-analytics
+    restart: unless-stopped
+    environment:
+      <<: *common-service-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    expose:
+      - "8088"
+    networks:
+      - ehipap-net
+    healthcheck:
+      <<: *app-healthcheck
+      test: ["CMD-SHELL", "bash -ec 'cat < /dev/null > /dev/tcp/127.0.0.1/8088'"]
+
+  api-gateway:
+    build:
+      context: ./backend/infrastructure/api-gateway
+    image: ehipap-gateway:latest
+    container_name: ehipap-gateway
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      JWT_SECRET: ehipap_jwt_super_secret_key_2024_production_grade_minimum_256_bits
+      AUTH_SERVICE_URL: http://identity-auth-service:8081
+      EMPLOYEE_SERVICE_URL: http://employee-lifecycle-service:8082
+      PAYROLL_SERVICE_URL: http://payroll-computation-engine:8083
+      ATTENDANCE_SERVICE_URL: http://attendance-leave-service:8084
+      RECRUITMENT_SERVICE_URL: http://recruitment-ats-service:8085
+      PERFORMANCE_SERVICE_URL: http://performance-management-service:8086
+      NOTIFICATION_SERVICE_URL: http://notification-communication-service:8087
+      ANALYTICS_SERVICE_URL: http://analytics-reporting-service:8088
+    depends_on:
+      identity-auth-service:
+        condition: service_started
+      employee-lifecycle-service:
+        condition: service_started
+      payroll-computation-engine:
+        condition: service_started
+      attendance-leave-service:
+        condition: service_started
+      recruitment-ats-service:
+        condition: service_started
+      performance-management-service:
+        condition: service_started
+      notification-communication-service:
+        condition: service_started
+      analytics-reporting-service:
+        condition: service_started
+    ports:
+      - "8880:8080"
+    networks:
+      - ehipap-net
+    healthcheck:
+      <<: *app-healthcheck
+      test: ["CMD-SHELL", "bash -ec 'cat < /dev/null > /dev/tcp/127.0.0.1/8080'"]
+
+  frontend:
+    build:
+      context: ./frontend
+    image: ehipap-frontend:latest
+    container_name: ehipap-frontend
+    restart: unless-stopped
+    depends_on:
+      api-gateway:
+        condition: service_started
+    ports:
+      - "3001:80"
+    networks:
+      - ehipap-net

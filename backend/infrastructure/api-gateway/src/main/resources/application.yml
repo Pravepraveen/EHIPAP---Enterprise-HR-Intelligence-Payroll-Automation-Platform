@@ -1,0 +1,100 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowedOrigins:
+              - "http://localhost:3000"
+              - "http://localhost:3001"
+              - "http://frontend"
+              - "*"
+            allowedMethods: ["GET","POST","PUT","DELETE","PATCH","OPTIONS"]
+            allowedHeaders: ["*"]
+            allowCredentials: false
+            maxAge: 3600
+      routes:
+        - id: auth-service
+          uri: ${AUTH_SERVICE_URL:http://localhost:8081}
+          predicates:
+            - Path=/api/v1/auth/**
+          filters:
+            - StripPrefix=0
+
+        - id: employee-service
+          uri: ${EMPLOYEE_SERVICE_URL:http://localhost:8082}
+          predicates:
+            - Path=/api/v1/employees/**,/api/v1/departments/**
+          filters:
+            - StripPrefix=0
+            - name: JwtAuthFilter
+
+        - id: payroll-service
+          uri: ${PAYROLL_SERVICE_URL:http://localhost:8083}
+          predicates:
+            - Path=/api/v1/payroll/**,/api/v1/payslips/**,/api/v1/salary/**
+          filters:
+            - StripPrefix=0
+            - name: JwtAuthFilter
+
+        - id: attendance-service
+          uri: ${ATTENDANCE_SERVICE_URL:http://localhost:8084}
+          predicates:
+            - Path=/api/v1/attendance/**,/api/v1/leaves/**
+          filters:
+            - StripPrefix=0
+            - name: JwtAuthFilter
+
+        - id: recruitment-service
+          uri: ${RECRUITMENT_SERVICE_URL:http://localhost:8085}
+          predicates:
+            - Path=/api/v1/jobs/**,/api/v1/candidates/**
+          filters:
+            - StripPrefix=0
+            - name: JwtAuthFilter
+
+        - id: performance-service
+          uri: ${PERFORMANCE_SERVICE_URL:http://localhost:8086}
+          predicates:
+            - Path=/api/v1/performance/**,/api/v1/goals/**
+          filters:
+            - StripPrefix=0
+            - name: JwtAuthFilter
+
+        - id: notification-service
+          uri: ${NOTIFICATION_SERVICE_URL:http://localhost:8087}
+          predicates:
+            - Path=/api/v1/notifications/**
+          filters:
+            - StripPrefix=0
+            - name: JwtAuthFilter
+
+        - id: analytics-service
+          uri: ${ANALYTICS_SERVICE_URL:http://localhost:8088}
+          predicates:
+            - Path=/api/v1/analytics/**
+          filters:
+            - StripPrefix=0
+            - name: JwtAuthFilter
+
+jwt:
+  secret: ${JWT_SECRET:ehipap_jwt_super_secret_key_2024_production_grade_minimum_256_bits}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    org.springframework.cloud.gateway: INFO
+    com.ehipap: DEBUG
